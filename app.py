@@ -6,7 +6,9 @@ import sqlite3
 import pandas as pd
 import io
 from langchain_core.prompts.prompt import PromptTemplate
+from langchain.prompts import PromptTemplate
 from utils.extarct_db import extract_name_and_colums , read_excel_query , read_sql_query
+from typing import List
 
 
 load_dotenv()
@@ -21,34 +23,35 @@ model=genai.GenerativeModel('gemini-pro')
 
 # Function to load gemini model
 
-def get_gemini_response(question,prompt):
-    model=genai.GenerativeModel('gemini-pro')
-    response=model.generate_content([prompt[0],question])
+
+def get_gemini_response(question: str, table_name: str, column_names: List[str]) -> str:
+    # Convert column_names list to a comma-separated string
+    columns_str = ', '.join(column_names)
+    
+    # Defining the prompt
+    prompt = PromptTemplate(
+        input_variables=["table_name", "columns"],
+        template=""" 
+        You are an expert in converting English questions to SQL query!
+        The SQL database has the name {table_name} and has the following columns - 
+        {columns}\n\nFor example,\nExample 1 - How many entries of records are present?,
+        the SQL command will be something like this SELECT COUNT(*) FROM {table_name} ;
+        \nExample 2 - Tell me all the students studying in Data Science class?,
+        the SQL command will be something like this SELECT * FROM {table_name}
+        where CLASS="Data Science";
+        also the sql code should not have ``` in beginning or end and sql word in output 
+        
+        """
+    )
+    
+    # Format the prompt with the table_name and columns_str
+    formatted_prompt = prompt.format(table_name=table_name, columns=columns_str)
+    
+    # Assuming genai is correctly imported and configured
+    model = genai.GenerativeModel('gemini-pro')
+    response = model.generate_content([formatted_prompt, question])
     return response.text
-
-
     
-# Defining the prompt 
-
-
-prompt = PromptTemplate(
-    input_variables= ["db","colums"],
-    
-    template=""" 
-    You are an expert in converting English questions to SQL query!
-    The SQL database has the name {db} and has the following columns - 
-    {colums}\n\nFor example,\nExample 1 - How many entries of records are present?,
-    the SQL command will be something like this SELECT COUNT(*) FROM {db} ;
-    \nExample 2 - Tell me all the student​​s studying in Data Science class?,
-    the SQL command will be something like this SELECT * FROM {db}
-    where CLASS="Data Science";
-    also the sql code should not have ``` in beginning or end and sql word in output 
-    
-    """
-    
-)  
-
-
 st.header("ConversDB")
 uploaded_file = st.sidebar.file_uploader("Choose a file", type=None)
 
@@ -72,38 +75,33 @@ if uploaded_file is not None:
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
                 
-                
+                            
             db_info = extract_name_and_colums(uploaded_file.name)
-            
-            p1 = prompt.format(db=db_info)
-            
-            
+            table_name = db_info['table_name'][0]
+            column_names = db_info['colum_names']['STUDENT']
 
             if submit:
-                
-                
-                response = get_gemini_response(question,p1)
-                
+                response = get_gemini_response(question, table_name, column_names)
                 print(response)
-                
-                # response = read_sql_query(response, file_path)
+                            
+                response = read_sql_query(response, file_path)
 
-                # # print(response)
-                # formatted_response=model.generate_content(f"Format this {response} in the table format")
-                # response_text = formatted_response.candidates[0].content.parts[0].text
-                # # Splitting the response text into lines
-                # lines = response_text.strip().split('\n')
+                # print(response)
+                formatted_response=model.generate_content(f"Format this {response} in the table format")
+                response_text = formatted_response.candidates[0].content.parts[0].text
+                # Splitting the response text into lines
+                lines = response_text.strip().split('\n')
 
-                # # Extracting column names and data
-                # columns = [col.strip() for col in lines[0].split('|') if col.strip()]
-                # data = [dict(zip(columns, [item.strip() for item in line.split('|') if item.strip()])) for line in lines[2:]]
+                # Extracting column names and data
+                columns = [col.strip() for col in lines[0].split('|') if col.strip()]
+                data = [dict(zip(columns, [item.strip() for item in line.split('|') if item.strip()])) for line in lines[2:]]
 
-                # # Creating DataFrame
-                # df = pd.DataFrame(data)
-                # st.subheader("The Response is ")
-                # st.table(df)
-                # # for row in response:
-                # #     print(row)
+                # Creating DataFrame
+                df = pd.DataFrame(data)
+                st.subheader("The Response is ")
+                st.table(df)
+                # for row in response:
+                #     print(row)
                 # #     st.header(row)
                 
                 
