@@ -6,7 +6,6 @@ import sqlite3
 import pandas as pd
 import io
 from langchain_core.prompts.prompt import PromptTemplate
-from langchain.prompts import PromptTemplate
 from utils.extarct_db import extract_name_and_colums , read_excel_query , read_sql_query
 from typing import List
 import numpy as np
