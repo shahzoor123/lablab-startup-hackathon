@@ -22,31 +22,19 @@ model=genai.GenerativeModel('gemini-pro')
 # Function to load gemini model
 
 def get_gemini_response(question,prompt):
+    print(question,prompt)
     model=genai.GenerativeModel('gemini-pro')
-    response=model.generate_content([prompt[0],question])
+    response=model.generate_content([prompt,question])
+    print(response)
     return response.text
 
 
     
-# Defining the prompt 
-
-
 prompt = PromptTemplate(
-    input_variables= ["db","colums"],
-    
-    template=""" 
-    You are an expert in converting English questions to SQL query!
-    The SQL database has the name {db} and has the following columns - 
-    {colums}\n\nFor example,\nExample 1 - How many entries of records are present?,
-    the SQL command will be something like this SELECT COUNT(*) FROM {db} ;
-    \nExample 2 - Tell me all the student​​s studying in Data Science class?,
-    the SQL command will be something like this SELECT * FROM {db}
-    where CLASS="Data Science";
-    also the sql code should not have ``` in beginning or end and sql word in output 
-    
-    """
-    
-)  
+    input_variables= ["db","colum"],
+    template = " You are an expert in converting English questions to SQL query! The SQL database has the name {db} and has the following columns - {colum}\n\nFor example,\nExample 1 - How many entries of records are present?,the SQL command will be something like this SELECT COUNT(*) FROM {db} ;\nExample 2 - Tell me all the student​​s studying in Data Science class?,the SQL command will be something like this SELECT * FROM {db} where CLASS= Data Science; also the sql code should not have ``` in beginning or end and sql word in output "
+
+) 
 
 
 st.header("ConversDB")
@@ -63,8 +51,7 @@ if uploaded_file is not None:
     if file_type in allowed_file_extensions:
         
         print(uploaded_file.name)
-        question=st.text_input("Input Prompt: " , key="input")
-        submit = st.button("Query")     
+          
         if file_type == "application/octet-stream":
             
             
@@ -75,36 +62,49 @@ if uploaded_file is not None:
                 
             db_info = extract_name_and_colums(uploaded_file.name)
             
-            p1 = prompt.format(db=db_info)
-            
+            db = db_info['table_name'][0]
+            colum = db_info['colum_names']["STUDENT"]
             
 
+            p1 = prompt.format(db=db, colum=colum)
+          
+            
+            submit = st.button("Query") 
+            question=st.text_input("Input Prompt: " , key="input") 
+            
             if submit:
                 
                 
-                response = get_gemini_response(question,p1)
                 
+                
+                
+            
+
+                
+                
+                print(response.choices[0].message.content)
+                
+                response = read_sql_query(response, file_path)
+
                 print(response)
+                formatted_response=model.generate_content(f"Format this {response} in the table format")
+                response_text = formatted_response.candidates[0].content.parts[0].text
                 
-                # response = read_sql_query(response, file_path)
+                print(response_text)
+                # Splitting the response text into lines
+                lines = response_text.strip().split('\n')
 
-                # # print(response)
-                # formatted_response=model.generate_content(f"Format this {response} in the table format")
-                # response_text = formatted_response.candidates[0].content.parts[0].text
-                # # Splitting the response text into lines
-                # lines = response_text.strip().split('\n')
+                # Extracting column names and data
+                columns = [col.strip() for col in lines[0].split('|') if col.strip()]
+                data = [dict(zip(columns, [item.strip() for item in line.split('|') if item.strip()])) for line in lines[2:]]
 
-                # # Extracting column names and data
-                # columns = [col.strip() for col in lines[0].split('|') if col.strip()]
-                # data = [dict(zip(columns, [item.strip() for item in line.split('|') if item.strip()])) for line in lines[2:]]
-
-                # # Creating DataFrame
-                # df = pd.DataFrame(data)
-                # st.subheader("The Response is ")
-                # st.table(df)
-                # # for row in response:
-                # #     print(row)
-                # #     st.header(row)
+                # Creating DataFrame
+                df = pd.DataFrame(data)
+                st.subheader("The Response is ")
+                st.table(df)
+                # for row in response:
+                #     print(row)
+                #     st.header(row)
                 
                 
                 
