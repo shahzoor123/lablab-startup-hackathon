@@ -9,6 +9,7 @@ from langchain.prompts import PromptTemplate
 from utils.extarct_db import extract_name_and_colums , read_excel_query , read_sql_query
 from typing import List
 import numpy as np
+import plotly.express as px
 
 import matplotlib.pyplot as plt
 
@@ -40,8 +41,6 @@ def get_gemini_response(question: str, table_name: str, column_names: List[str])
         the SQL command will be something like this SELECT COUNT(*) FROM {table_name} ;
         \nExample 2 - Tell me all the students studying in Data Science class?,
         the SQL command will be something like this SELECT * FROM {table_name}
-        where CLASS="Data Science";
-        and remove "_" underscore between colum names show like Full Name
         also the sql code should not have ``` in beginning or end and sql word in output 
         
         """
@@ -63,14 +62,16 @@ if uploaded_file is not None:
 
     
     file_type = uploaded_file.type
-    allowed_file_extensions = ["application/octet-stream"]
+    allowed_file_extensions = ["application/octet-stream", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"]
     
     
     if file_type in allowed_file_extensions:
         
         print(uploaded_file.name)
         question=st.text_input("Input Prompt: " , key="input")
-        submit = st.button("Query")     
+        submit = st.button("Query") 
+        
+            
         if file_type == "application/octet-stream":
             
             
@@ -108,92 +109,76 @@ if uploaded_file is not None:
                 df = pd.DataFrame(data)
                 st.subheader("The Response is ")
                 st.table(df)
-                # for row in response:
-                #     print(row)
-                # #     st.header(row)
                 
+                try:
+                    # Example chart with Plotly
+                    fig = px.bar(df, x=columns[0], y=columns[1], title="Visualize")
+                    st.plotly_chart(fig)
+                except:
+                    st.success("No Enough data available to do analysis")
 
-                
-                # # Convert to DataFrame
-                # df = pd.DataFrame(data, columns=columns)
-
-             
-            
-                # chart_data = pd.DataFrame(df, columns=column_names)
-
-                # st.bar_chart(chart_data)
+        
                 
                  
                 
                 
                 
                 
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-                
-        # if file_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+        if file_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
             
-        #     # converting excel file to db format then deleting excel file
-        #     db_name = "data.db"
-        #     file_path = os.path.join(os.getcwd(), uploaded_file.name)
-        #     with open(file_path, "wb") as f:
-        #         f.write(uploaded_file.getbuffer())
+            # converting excel file to db format then deleting excel file
+            db_name = "data.db"
+            file_path = os.path.join(os.getcwd(), uploaded_file.name)
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
 
-        #     df = pd.read_excel(file_path)
-        #     conn = sqlite3.connect(db_name)
-        #     df.to_sql("excel_data", conn, index=False, if_exists="replace")
-        #     conn.close()
-        #     # os.remove(file_path)
+            df = pd.read_excel(file_path)
+            conn = sqlite3.connect(db_name)
+            df.to_sql("excel_data", conn, index=False, if_exists="replace")
+            conn.close()
+            # os.remove(file_path)
             
             
-        #     # extracting DB Name & colum names
+            # extracting DB Name & colum names
             
-        #     db_info = extract_name_and_colums(db_name)
-        #     table_name = db_info['table_name'][0]
-        #     column_names = db_info['colum_names']
+            db_info = extract_name_and_colums(db_name)
+            table_name = db_info['table_name'][0]
+            column_names = db_info['colum_names']
             
-        #     print(column_names)
+            print(column_names)
             
             
-        #     if submit:
-        #         response = get_gemini_response(question, table_name, column_names)
-        #         print(response)
+            if submit:
+                response = get_gemini_response(question, table_name, column_names)
+                print(response)
                             
-        #         response = read_sql_query(response, db_name)
+                response = read_sql_query(response, db_name)
 
-        #         # print(response)
-        #         formatted_response=model.generate_content(f"Format this {response} in the table format")
-        #         response_text = formatted_response.candidates[0].content.parts[0].text
-        #         # Splitting the response text into lines
-        #         lines = response_text.strip().split('\n')
+                # print(response)
+                formatted_response=model.generate_content(f"Format this {response} in the table format")
+                response_text = formatted_response.candidates[0].content.parts[0].text
+                # Splitting the response text into lines
+                lines = response_text.strip().split('\n')
 
-        #         # Extracting column names and data
-        #         columns = [col.strip() for col in lines[0].split('|') if col.strip()]
-        #         data = [dict(zip(columns, [item.strip() for item in line.split('|') if item.strip()])) for line in lines[2:]]
+                # Extracting column names and data
+                columns = [col.strip() for col in lines[0].split('|') if col.strip()]
+                data = [dict(zip(columns, [item.strip() for item in line.split('|') if item.strip()])) for line in lines[2:]]
 
-        #         # Creating DataFrame
-        #         df = pd.DataFrame(data)
-        #         st.subheader("The Response is ")
-        #         st.table(df)
-        #         # for row in response:
-        #         #     print(row)
-        #         # #     st.header(row)
-            
+                # Creating DataFrame
+                df = pd.DataFrame(data)
+                st.subheader("The Response is ")
+                st.table(df)
+                
+                try:
+                    # Example chart with Plotly
+                    fig = px.bar(df, x=columns[0], y=columns[1], title="Visualize")
+                    st.plotly_chart(fig)
+                except:
+                    st.success("No Enough data available to do analysis")
 
-        # else:
-        #     st.error("File type is not allowed. Please upload a .db or .xlsx file.")
-    
+    else:
+        st.error("File type is not allowed. Please upload a .db or .xlsx file.")
+        
     
     
 
